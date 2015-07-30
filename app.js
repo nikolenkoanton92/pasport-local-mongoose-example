@@ -10,28 +10,16 @@ var routes = require('./routes/index');
 var users = require('./routes/users');
 
 var app = express();
+var User = require('./models/users');
 
+var passport = require('passport');
+var mongoose = require('mongoose');
 
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
 
-
-var User = require('./models/users');
-
-var passport = require('passport');
-var mongoose = require('mongoose');
-
-passport.use(User.createStrategy());
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
-
-mongoose.connect('mongodb://127.0.0.1:27017/local-mongoose', function(err) {
-  if (err) {
-    console.log(err);
-  }
-});
 
 
 // uncomment after placing your favicon in /public
@@ -43,13 +31,23 @@ app.use(bodyParser.urlencoded({
 }));
 app.use(cookieParser());
 app.use(require('express-session')({
-  secret: 'cat is cat',
-  resave: false,
-  saveUninitialized: false
+  secret: 'cat is cat'
 }));
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
+
+
+var User = require('./models/users');
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
+mongoose.connect('mongodb://127.0.0.1:27017/local-mongoose', function(err) {
+  if (err) {
+    console.log(err);
+  }
+});
 
 app.get('/', function(req, res) {
   res.render('index');
@@ -59,8 +57,13 @@ app.get('/public', function(req, res) {
   res.send('Public Page');
 });
 
-app.get('/private', function(req, res) {
-  res.render('private');
+app.get('/private', function(req, res, next) {
+  if (req.user) {
+    res.render('private');
+  } else {
+    res.redirect('/login');
+  }
+
 });
 
 app.get('/signup', function(req, res) {
@@ -84,6 +87,29 @@ app.post('/signup', function(req, res) {
       });
     });
 
+  });
+});
+
+app.get('/login', function(req, res) {
+  res.render('login');
+});
+
+app.post('/login', passport.authenticate('local'), function(req, res, next) {
+  req.session.save(function(err) {
+    if (err) {
+      return next(err);
+    }
+    res.redirect('/private');
+  });
+});
+
+app.get('/logout', function(req, res, next) {
+  req.logout();
+  req.session.save(function(err) {
+    if (err) {
+      return next(err);
+    }
+    res.redirect('/');
   });
 });
 
